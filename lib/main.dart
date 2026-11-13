@@ -398,34 +398,176 @@ class WalkerPendingScreen extends StatelessWidget {
   );
 }
 
-class WalkerDashboard extends StatelessWidget {
+class WalkerDashboard extends StatefulWidget {
   const WalkerDashboard({required this.name, super.key});
   final String name;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
-      IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
-    ]),
-    body: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Welcome, $name', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        const Text('Your walker account is approved and active.'),
-        const SizedBox(height: 24),
-        const Card(child: ListTile(
-          leading: Icon(Icons.pets),
-          title: Text('Walk assignments'),
-          subtitle: Text('Your assigned walks will appear here once dispatch is enabled.'),
-        )),
-        const SizedBox(height: 12),
-        const Card(child: ListTile(
-          leading: Icon(Icons.schedule),
-          title: Text('Availability'),
-          subtitle: Text('Availability scheduling will be added in the next stage.'),
-        )),
-      ]),
-    ),
+  State<WalkerDashboard> createState() => _WalkerDashboardState();
+}
+
+class _WalkerDashboardState extends State<WalkerDashboard> {
+  late Future<Map<String, dynamic>> _dashboard;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    _dashboard = FirebaseFunctions.instance.httpsCallable('getWalkerDashboard')
+      .call().then((result) => Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<void> _refresh() async {
+    setState(_reload);
+    try { await _dashboard; } catch (_) {}
+  }
+
+  Future<TimeOfDay?> _pickTime(BuildContext context, TimeOfDay initial) {
+    return showTimePicker(context: context, initialTime: initial);
+  }
+
+  Future<void> _addAvailability() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 30)),
+    );
+    if (date == null || !mounted) return;
+    final startTime = await _pickTime(context, const TimeOfDay(hour: 9, minute: 0));
+    if (startTime == null || !mounted) return;
+    final endTime = await _pickTime(context, const TimeOfDay(hour: 17, minute: 0));
+    if (endTime == null || !mounted) return;
+    final start = DateTime(date.year, date.month, date.day, startTime.hour, startTime.minute);
+    final end = DateTime(date.year, date.month, date.day, endTime.hour, endTime.minute);
+    if (!start.isAfter(DateTime.now()) || !end.isAfter(start)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a future start time and a later end time.')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await FirebaseFunctions.instance.httpsCallable('saveWalkerAvailability').call({
+        'windows': [{'startAt': start.toUtc().toIso8601String(), 'endAt': end.toUtc().toIso8601String()}],
+      });
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Availability saved successfully.')),
+        );
+      }
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? 'Could not save availability.')),
+      );
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save availability. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _formatDate(dynamic value) {
+    if (value is! String) return 'Time not available';
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    if (parsed == null) return 'Time not available';
+    return '${parsed.day.toString().padLeft(2, '0')}/${parsed.month.toString().padLeft(2, '0')}/${parsed.year}  ${TimeOfDay.fromDateTime(parsed).format(context)}';
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+    future: _dashboard,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      if (snapshot.hasError) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
+            IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
+          ]),
+          body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Could not load your dashboard.'),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: _refresh, child: const Text('Retry')),
+          ])),
+        );
+      }
+      final data = snapshot.data!;
+      final bookings = (data['bookings'] as List<dynamic>? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final windows = (data['availability'] as List<dynamic>? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      return Scaffold(
+        appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
+          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+          IconButton(onPressed: () => FirebaseAuth.instance.signOut(), icon: const Icon(Icons.logout)),
+        ]),
+        body: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text('Welcome, ${widget.name}', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 6),
+              const Text('Your walker account is approved and active.'),
+              const SizedBox(height: 24),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('My availability', style: Theme.of(context).textTheme.titleLarge),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _addAvailability,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add time'),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              if (windows.isEmpty)
+                const Card(child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('No future availability added. Add the dates and hours when you can accept walks.'),
+                ))
+              else
+                ...windows.map((window) => Card(child: ListTile(
+                  leading: const Icon(Icons.schedule),
+                  title: Text(_formatDate(window['startAt'])),
+                  subtitle: Text('Until ${_formatDate(window['endAt'])}'),
+                ))),
+              const SizedBox(height: 24),
+              Text('Assigned walks', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              if (bookings.isEmpty)
+                const Card(child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('No confirmed upcoming walks assigned yet. New confirmed bookings will appear here.'),
+                ))
+              else
+                ...bookings.map((booking) => Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(booking['petName'] as String? ?? 'Pet walk',
+                        style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(_formatDate(booking['scheduledAt'])),
+                      Text('${booking['durationMinutes']} minute walk'),
+                      Text('${booking['address']}, ${booking['city']} ${booking['pincode']}'),
+                      const SizedBox(height: 6),
+                      const Text('Payment confirmed', style: TextStyle(color: Colors.green)),
+                    ]),
+                  ),
+                )),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
