@@ -1,10 +1,11 @@
-name: Walker Flutter CI
+name: Walker Flutter Android CI
 
 on:
   push:
     branches: [main]
     paths:
       - "lib/**"
+      - "android/**"
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".github/workflows/flutter-ci.yml"
@@ -12,21 +13,89 @@ on:
     branches: [main]
     paths:
       - "lib/**"
+      - "android/**"
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".github/workflows/flutter-ci.yml"
 
+permissions:
+  contents: write
+
 jobs:
-  analyze:
+  android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Generate Android platform scaffold
+        run: flutter create --platforms=android --project-name dojo_partner --org com.example --overwrite .
+
+      - name: Configure Google Services Gradle plugin
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          settings_candidates = [Path("android/settings.gradle.kts"), Path("android/settings.gradle")]
+          app_candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          settings = next((p for p in settings_candidates if p.exists()), None)
+          app = next((p for p in app_candidates if p.exists()), None)
+          if settings is None or app is None:
+              raise SystemExit("Flutter Android Gradle files were not generated.")
+
+          settings_text = settings.read_text()
+          if "com.google.gms.google-services" not in settings_text:
+              line = ('    id("com.google.gms.google-services") version "4.4.2" apply false\\n'
+                      if settings.suffix == ".kts" else
+                      "    id 'com.google.gms.google-services' version '4.4.2' apply false\\n")
+              marker = "plugins {"
+              if marker not in settings_text:
+                  raise SystemExit("Could not find Gradle plugins block in settings file.")
+              settings_text = settings_text.replace(marker, marker + "\\n" + line.rstrip(), 1)
+              settings.write_text(settings_text)
+
+          app_text = app.read_text()
+          if "com.google.gms.google-services" not in app_text:
+              line = ('    id("com.google.gms.google-services")\\n'
+                      if app.suffix == ".kts" else
+                      "    id 'com.google.gms.google-services'\\n")
+              marker = "plugins {"
+              if marker not in app_text:
+                  raise SystemExit("Could not find Gradle plugins block in app file.")
+              app_text = app_text.replace(marker, marker + "\\n" + line.rstrip(), 1)
+              app.write_text(app_text)
+          PY
+
+      - name: Commit generated Android project files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android
+          if ! git diff --cached --quiet; then
+            git commit -m "Add Android platform scaffold and Firebase Gradle setup"
+            git push
+          fi
+
       - name: Install dependencies
         run: flutter pub get
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+
+      - name: Build Android APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dojo-walk-walker-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
