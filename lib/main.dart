@@ -160,7 +160,7 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
   Future<void> _finishCredential(PhoneAuthCredential credential) async {
     try {
       final auth = FirebaseAuth.instance;
-      if (_linkingLegacy && auth.currentUser != null) {
+      if (auth.currentUser != null && auth.currentUser!.phoneNumber == null) {
         await auth.currentUser!.linkWithCredential(credential);
         await auth.currentUser!.reload();
       } else {
