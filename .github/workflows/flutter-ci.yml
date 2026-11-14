@@ -35,9 +35,6 @@ jobs:
         with:
           channel: stable
 
-      - name: Generate Android platform scaffold
-        run: flutter create --platforms=android --project-name dojo_partner --org com.example --overwrite .
-
       - name: Configure Google Services Gradle plugin
         run: |
           python3 - <<'PY'
