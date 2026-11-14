@@ -49,61 +49,160 @@ class WalkerAuthGate extends StatelessWidget {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
       final user = snapshot.data;
-      if (user == null) return const WalkerSignInScreen();
+      if (user == null || user.phoneNumber == null) return const WalkerSignInScreen();
       return WalkerPortal(key: ValueKey(user.uid));
     },
   );
 }
 
+
 class WalkerSignInScreen extends StatefulWidget {
   const WalkerSignInScreen({super.key});
-
   @override
   State<WalkerSignInScreen> createState() => _WalkerSignInScreenState();
 }
 
 class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  bool _createAccount = false;
+  final _phone = TextEditingController();
+  final _otp = TextEditingController();
+  final _displayName = TextEditingController();
+  final _legacyEmail = TextEditingController();
+  final _legacyPassword = TextEditingController();
   bool _busy = false;
+  bool _codeSent = false;
+  bool _linkingLegacy = false;
+  bool _showLegacy = false;
+  String? _verificationId;
+  int? _resendToken;
 
   @override
   void dispose() {
-    _email.dispose();
-    _password.dispose();
+    _phone.dispose();
+    _otp.dispose();
+    _displayName.dispose();
+    _legacyEmail.dispose();
+    _legacyPassword.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  String? _e164Phone() {
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) return '+91$digits';
+    if (digits.length == 12 && digits.startsWith('91') && RegExp(r'^91[6-9]\d{9}$').hasMatch(digits)) return '+$digits';
+    return null;
+  }
+
+  void _message(String value) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+  }
+
+  Future<void> _requestOtp({bool linkLegacy = false, bool resend = false}) async {
+    final phone = _e164Phone();
+    if (phone == null) {
+      _message('Enter a valid 10-digit Indian mobile number.');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final auth = FirebaseAuth.instance;
-      if (_createAccount) {
-        await auth.createUserWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text,
+      if (linkLegacy && !_linkingLegacy) {
+        if (_legacyEmail.text.trim().isEmpty || _legacyPassword.text.isEmpty) {
+          _message('Enter your existing account email and password first.');
+          return;
+        }
+        final result = await auth.signInWithEmailAndPassword(
+          email: _legacyEmail.text.trim(),
+          password: _legacyPassword.text,
         );
-      } else {
-        await auth.signInWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text,
-        );
+        if (result.user == null) throw FirebaseAuthException(code: 'user-not-found');
+        if (result.user!.phoneNumber != null) {
+          _message('This account already has a verified phone. Sign in using mobile OTP.');
+          return;
+        }
+        _linkingLegacy = true;
       }
+
+      await auth.verifyPhoneNumber(
+        phoneNumber: phone,
+        timeout: const Duration(seconds: 60),
+        forceResendingToken: resend ? _resendToken : null,
+        verificationCompleted: (credential) async {
+          await _finishCredential(credential);
+        },
+        verificationFailed: (error) {
+          _message(error.message ?? 'Could not send OTP. Please try again.');
+        },
+        codeSent: (verificationId, resendToken) {
+          if (!mounted) return;
+          setState(() {
+            _verificationId = verificationId;
+            _resendToken = resendToken;
+            _codeSent = true;
+          });
+          _message('OTP sent. Enter the 6-digit code.');
+        },
+        codeAutoRetrievalTimeout: (verificationId) {
+          _verificationId = verificationId;
+        },
+      );
     } on FirebaseAuthException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? 'Could not authenticate.')),
-        );
-      }
+      _message(error.code == 'credential-already-in-use' || error.code == 'phone-number-already-exists'
+        ? 'This mobile number is linked to another account. Account recovery is required; accounts will not be merged automatically.'
+        : error.message ?? 'Authentication failed. Please try again.');
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Something went wrong. Please try again.')),
-        );
+      _message('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _finishCredential(PhoneAuthCredential credential) async {
+    try {
+      final auth = FirebaseAuth.instance;
+      if (_linkingLegacy && auth.currentUser != null) {
+        await auth.currentUser!.linkWithCredential(credential);
+        await auth.currentUser!.reload();
+      } else {
+        await auth.signInWithCredential(credential);
       }
+      final name = _displayName.text.trim();
+      if (name.isNotEmpty && auth.currentUser != null) {
+        await auth.currentUser!.updateDisplayName(name);
+      }
+      if (!mounted) return;
+      setState(() {
+        _codeSent = false;
+        _linkingLegacy = false;
+        _verificationId = null;
+        _otp.clear();
+      });
+      _message('Mobile number verified successfully.');
+    } on FirebaseAuthException catch (error) {
+      _message(error.code == 'credential-already-in-use' || error.code == 'phone-number-already-exists'
+        ? 'This mobile number belongs to another account. Please contact support for secure account recovery.'
+        : error.message ?? 'Could not verify this mobile number.');
+    } catch (_) {
+      _message('Could not complete mobile verification. Please try again.');
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final verificationId = _verificationId;
+    final code = _otp.text.trim();
+    if (verificationId == null || !RegExp(r'^\d{6}$').hasMatch(code)) {
+      _message('Enter the 6-digit OTP.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: code,
+      );
+      await _finishCredential(credential);
+    } on FirebaseAuthException catch (error) {
+      _message(error.message ?? 'Invalid or expired OTP.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -117,48 +216,104 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(Icons.pets, size: 56),
-                const SizedBox(height: 12),
-                Text(_createAccount ? 'Become a DOJO WALK partner' : 'Walker sign in',
-                  style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                Text(_createAccount
-                  ? 'Create an account and submit your details for admin approval.'
-                  : 'Sign in to view your walker application and assigned walks.'),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email address'),
-                  validator: (v) => v == null || !v.trim().contains('@')
-                    ? 'Enter a valid email address' : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.pets, size: 58),
+              const SizedBox(height: 14),
+              Text(
+                _linkingLegacy ? 'Secure your existing account' : 'Welcome to DOJO WALK',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(_linkingLegacy
+                ? 'Verify your mobile by OTP. It will be linked to your existing account so your history stays safe.'
+                : 'Continue securely with your mobile number. No password required.'),
+              const SizedBox(height: 24),
+              if (!_codeSent && !_showLegacy) ...[
+                TextField(
+                  controller: _displayName,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(labelText: 'Your name (optional)'),
                 ),
                 const SizedBox(height: 14),
-                TextFormField(
-                  controller: _password,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password (minimum 8 characters)'),
-                  validator: (v) => v == null || v.length < 8
-                    ? 'Password must be at least 8 characters' : null,
+                TextField(
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile number',
+                    prefixText: '+91 ',
+                    counterText: '',
+                  ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 FilledButton(
-                  onPressed: _busy ? null : _submit,
+                  onPressed: _busy ? null : () => _requestOtp(),
                   child: _busy
                     ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(_createAccount ? 'Create walker account' : 'Sign in'),
+                    : const Text('Continue with OTP'),
                 ),
                 TextButton(
-                  onPressed: _busy ? null : () => setState(() => _createAccount = !_createAccount),
-                  child: Text(_createAccount ? 'Already registered? Sign in' : 'New walker? Create account'),
+                  onPressed: _busy ? null : () => setState(() => _showLegacy = true),
+                  child: const Text('Already have an account? Link it safely'),
                 ),
               ],
-            ),
+              if (!_codeSent && _showLegacy) ...[
+                const Text('Existing account recovery'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _legacyEmail,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Existing account email'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _legacyPassword,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Existing account password'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  decoration: const InputDecoration(labelText: 'Mobile number to verify', prefixText: '+91 ', counterText: ''),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _busy ? null : () => _requestOtp(linkLegacy: true),
+                  child: _busy
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Verify & link mobile'),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : () => setState(() => _showLegacy = false),
+                  child: const Text('Back to mobile OTP sign in'),
+                ),
+              ],
+              if (_codeSent) ...[
+                Text('Enter the OTP sent to +91 ' + _phone.text.trim()),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _otp,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(labelText: '6-digit OTP', counterText: ''),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _busy ? null : _verifyOtp,
+                  child: _busy
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Verify OTP'),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : () => _requestOtp(resend: true),
+                  child: const Text('Resend OTP'),
+                ),
+              ],
+            ],
           ),
         ),
       ),
