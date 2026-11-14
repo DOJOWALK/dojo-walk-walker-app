@@ -475,6 +475,33 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
     }
   }
 
+  Future<void> _updateBookingStatus(String bookingId, String action) async {
+    try {
+      await FirebaseFunctions.instance.httpsCallable('updateWalkerBookingStatus').call({
+        'bookingId': bookingId,
+        'action': action,
+      });
+      await _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(action == 'start' ? 'Walk started.' : 'Walk marked as completed.')),
+        );
+      }
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? 'Could not update this walk.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not update this walk. Please try again.')),
+        );
+      }
+    }
+  }
+
   String _formatDate(dynamic value) {
     if (value is! String) return 'Time not available';
     final parsed = DateTime.tryParse(value)?.toLocal();
@@ -560,7 +587,26 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                       Text('${booking['durationMinutes']} minute walk'),
                       Text('${booking['address']}, ${booking['city']} ${booking['pincode']}'),
                       const SizedBox(height: 6),
-                      const Text('Payment confirmed', style: TextStyle(color: Colors.green)),
+                      Text(
+                        booking['status'] == 'in_progress' ? 'Walk in progress' : 'Payment confirmed',
+                        style: TextStyle(
+                          color: booking['status'] == 'in_progress' ? Colors.orange.shade800 : Colors.green,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (booking['status'] == 'in_progress')
+                        FilledButton.icon(
+                          onPressed: () => _updateBookingStatus(booking['bookingId'] as String, 'complete'),
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: const Text('Complete walk'),
+                        )
+                      else
+                        FilledButton.icon(
+                          onPressed: () => _updateBookingStatus(booking['bookingId'] as String, 'start'),
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Start walk'),
+                        ),
                     ]),
                   ),
                 )),
