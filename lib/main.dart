@@ -30,7 +30,12 @@ class WalkerApp extends StatelessWidget {
     title: 'DOJO WALK Walker',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
-      colorSchemeSeed: const Color(0xFFFF7900),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFFF28C28),
+        primary: const Color(0xFFF28C28),
+        secondary: const Color(0xFF174A78),
+        surface: const Color(0xFFFFFDF9),
+      ),
       useMaterial3: true,
       inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
     ),
