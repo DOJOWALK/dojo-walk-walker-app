@@ -73,17 +73,6 @@ jobs:
               app.write_text(app_text)
           PY
 
-      - name: Commit generated Android project files
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add android
-          if ! git diff --cached --quiet; then
-            git commit -m "Add Android platform scaffold and Firebase Gradle setup"
-            git push
-          fi
-
       - name: Install dependencies
         run: flutter pub get
 
