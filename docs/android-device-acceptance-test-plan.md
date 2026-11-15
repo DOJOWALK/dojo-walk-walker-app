@@ -3,7 +3,7 @@
 Status: manual test plan and implementation gap register; execution evidence has not yet been recorded.
 
 ## Current implementation boundary
-The current Walker app repository is a Flutter starter with Firebase Core, Firebase Authentication, and Cloud Functions dependencies. Its README identifies profile/availability, assigned walks, and walk status as initial scope, but explicitly says production identity checks, location tracking, and payout workflows remain to be implemented. The current Android main manifest does not declare location permissions or a location/background service. Therefore location tracking and background walk monitoring must be treated as **not implemented**, not as test-passing features.
+The current app already implements Indian mobile OTP sign-in (including a legacy email/password account-linking path), walker application submission and pending/approved states, availability-window creation, an assigned/upcoming walk dashboard, and backend-authorized start/complete actions. The backend enforces active approved walker status, assignment ownership, walk timing, and a minimum five-minute in-progress period before completion. These are implemented flows that still require device acceptance testing. Production identity/document verification, incident reporting, owner handover capture, location tracking, and payout workflows are **not implemented**. The Android main manifest does not declare location permissions or a location/background service. Do not represent any of those missing capabilities as available.
 
 Do not request location permission from walkers until a clear, consent-based location feature and its retention/access policy are implemented.
 
@@ -16,25 +16,27 @@ Do not request location permission from walkers until a clear, consent-based loc
 
 ## A. Install, authentication, and account isolation
 1. Install and launch the candidate build; verify no crash on cold start and relaunch.
-2. Sign in with an approved walker account; verify customer/admin accounts cannot enter walker-only workflows.
-3. Sign out and switch accounts; verify prior walk/customer data is cleared from the visible session.
-4. Test invalid credentials, expired session, offline launch, and server permission errors.
-5. Verify no sensitive customer or dog information is exposed outside an assigned job.
+2. Sign in with an approved walker account using mobile OTP; verify customer/admin accounts cannot enter walker-only workflows.
+3. Submit a new walker application and verify it remains pending/inactive until admin approval; verify an approved account reaches the dashboard.
+4. Verify the legacy email/password account can be linked to a verified mobile number without silently merging a different existing account.
+5. Sign out and switch accounts; verify prior walk/customer data is cleared from the visible session.
+6. Test invalid OTP, expired session, offline launch, and server permission errors.
+7. Verify no sensitive customer or dog information is exposed outside an assigned job.
 
 ## B. Assignment and schedule integrity
 1. Verify only jobs assigned to the signed-in walker are visible.
 2. Verify date, local time (Asia/Kolkata), duration, service address, and dog-care instructions match backend data.
 3. Verify overlapping jobs cannot both be accepted or started.
-4. Verify leave/unavailability and travel/rest buffers are respected by backend assignment.
+4. Verify availability windows cannot overlap and that leave/unavailability and travel/rest buffers are respected by backend assignment; document any missing leave-editing controls.
 5. Verify a changed or withdrawn assignment is reflected after refresh; stale cached data must not authorize a walk.
 6. Verify a backup walker cannot see or accept a job unless the backend has explicitly assigned it with the required customer consent.
 
 ## C. Walk lifecycle and safety
-1. Verify the walker can see the required owner handover and emergency contact instructions for an assigned walk.
+1. Confirm owner handover instructions and emergency contact details are not yet captured/displayed in the current app; block live operations until an approved operational handover process exists.
 2. Verify start/complete actions are authenticated, authorized for that walker, and idempotent on repeated taps.
 3. Verify a second start/completion request does not create duplicate events or payout entries.
 4. Verify the app does not offer off-leash or multi-household handling as a default.
-5. Verify incident reporting captures the minimum necessary details and routes the issue to DOJO WALK operations.
+5. Confirm in-app incident reporting is not implemented; block live operations until walkers have a tested incident escalation channel to DOJO WALK operations.
 6. Verify a walk cannot be marked complete before its valid assignment/start state according to backend rules.
 7. Verify offline actions are not shown as server-confirmed until synchronized and acknowledged.
 
