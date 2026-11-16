@@ -15,4 +15,31 @@ void main() {
       expect(walkerActionForBookingStatus(null), isNull);
     });
   });
+  group('walkerCanCompleteNow', () {
+    final startedAt = DateTime.utc(2026, 11, 16, 10).toIso8601String();
+
+    test('blocks completion before five minutes', () {
+      expect(
+        walkerCanCompleteNow(startedAt, now: DateTime.utc(2026, 11, 16, 10, 4, 59)),
+        isFalse,
+      );
+    });
+
+    test('allows completion at five minutes and afterwards', () {
+      expect(
+        walkerCanCompleteNow(startedAt, now: DateTime.utc(2026, 11, 16, 10, 5)),
+        isTrue,
+      );
+      expect(
+        walkerCanCompleteNow(startedAt, now: DateTime.utc(2026, 11, 16, 10, 6)),
+        isTrue,
+      );
+    });
+
+    test('fails closed for missing or invalid start timestamps', () {
+      expect(walkerCanCompleteNow(null), isFalse);
+      expect(walkerCanCompleteNow('not-a-date'), isFalse);
+    });
+  });
+
 }
