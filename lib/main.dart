@@ -856,6 +856,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
   }
 
   String _paymentStatusLabel(String? status) {
+    if (status == 'not_required') return 'No payment required';
     if (status == 'paid') return 'Payment received';
     if (status == null || status.isEmpty) return 'Payment status unavailable';
     return 'Payment · ${status.replaceAll('_', ' ')}';
