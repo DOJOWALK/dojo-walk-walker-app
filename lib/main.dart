@@ -850,6 +850,14 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
       final windows = (data['availability'] as List<dynamic>? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
       final inProgressCount = bookings.where((booking) => booking['status'] == 'in_progress').length;
+      final sortedBookings = [...bookings]..sort((a, b) {
+        final aDate = DateTime.tryParse(a['scheduledAt']?.toString() ?? '');
+        final bDate = DateTime.tryParse(b['scheduledAt']?.toString() ?? '');
+        if (aDate == null) return bDate == null ? 0 : 1;
+        if (bDate == null) return -1;
+        return aDate.compareTo(bDate);
+      });
+      final nextBooking = sortedBookings.isEmpty ? null : sortedBookings.first;
       return Scaffold(
         appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
@@ -965,7 +973,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                   child: Text('No confirmed upcoming walks assigned yet. New confirmed bookings will appear here.'),
                 ))
               else
-                ...bookings.map((booking) => Card(
+                ...sortedBookings.map((booking) => Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
