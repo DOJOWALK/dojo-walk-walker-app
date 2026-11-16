@@ -40,7 +40,63 @@ class WalkerApp extends StatelessWidget {
         surface: const Color(0xFFFFFDF9),
       ),
       useMaterial3: true,
-      inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+      scaffoldBackgroundColor: const Color(0xFFF6F8FB),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFFFFFDF9),
+        foregroundColor: Color(0xFF174A78),
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        centerTitle: false,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 3,
+        shadowColor: Color(0x24174A78),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE8EDF3)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDCE4ED)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDCE4ED)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFF28C28), width: 1.8),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+          elevation: 3,
+          shadowColor: const Color(0x55F28C28),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          side: const BorderSide(color: Color(0xFF174A78), width: 1.2),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     ),
     home: const WalkerAuthGate(),
   );
