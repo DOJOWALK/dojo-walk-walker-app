@@ -10,3 +10,16 @@ String? walkerActionForBookingStatus(String? status) {
       return null;
   }
 }
+
+/// Keeps the completion control disabled until five minutes after the
+/// backend-recorded start time. Firebase remains authoritative.
+bool walkerCanCompleteNow(String? startedAt, {DateTime? now}) {
+  if (startedAt == null) return false;
+  try {
+    final started = DateTime.parse(startedAt).toUtc();
+    final availableAt = started.add(const Duration(minutes: 5));
+    return !(now ?? DateTime.now()).toUtc().isBefore(availableAt);
+  } on FormatException {
+    return false;
+  }
+}
