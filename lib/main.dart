@@ -1013,7 +1013,16 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                       const SizedBox(height: 6),
                       Text(_formatDate(booking['scheduledAt'])),
                       Text('${booking['durationMinutes']} minute walk'),
-                      Text('${booking['address']}, ${booking['city']} ${booking['pincode']}'),
+                      if (booking['endsAt'] is String)
+                        Text('Planned end · ${_formatDate(booking['endsAt'])}'),
+                      if (booking['startedAt'] is String)
+                        Text('Started · ${_formatDate(booking['startedAt'])}'),
+                      const SizedBox(height: 4),
+                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF174A78)),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('${booking['address']}, ${booking['city']} ${booking['pincode']}')),
+                      ]),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
