@@ -350,7 +350,7 @@ class _WalkerPortalState extends State<WalkerPortal> {
       }
       return WalkerApplicationScreen(
         initialName: data['displayName'] as String? ?? '',
-        initialPhone: data['phone'] as String? ?? '',
+        initialPhone: (FirebaseAuth.instance.currentUser?.phoneNumber ?? data['phone'] as String? ?? '').replaceAll(RegExp(r'\\D'), '').replaceFirst(RegExp(r'^91'), ''),
         initialEmail: data['email'] as String? ?? '',
         onSubmitted: _refresh,
         rejected: status == 'rejected',
@@ -488,8 +488,8 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: '10-digit mobile number'),
+              readOnly: true,
+              decoration: const InputDecoration(labelText: 'Verified mobile number', prefixText: '+91 '),
               validator: (v) => v == null || !RegExp(r'^[6-9][0-9]{9}$').hasMatch(v.trim())
                 ? 'Enter a valid 10-digit Indian mobile number' : null,
             ),
