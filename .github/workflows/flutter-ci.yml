@@ -15,6 +15,7 @@ on:
     branches: [main]
     paths:
       - "lib/**"
+      - "test/**"
       - "android/**"
       - "pubspec.yaml"
       - "pubspec.lock"
