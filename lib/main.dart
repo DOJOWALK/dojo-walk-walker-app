@@ -565,6 +565,7 @@ class WalkerDashboard extends StatefulWidget {
 class _WalkerDashboardState extends State<WalkerDashboard> {
   late Future<Map<String, dynamic>> _dashboard;
   bool _saving = false;
+  bool _statusBusy = false;
 
   @override
   void initState() {
@@ -632,6 +633,8 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
   }
 
   Future<void> _updateBookingStatus(String bookingId, String action) async {
+    if (_statusBusy) return;
+    setState(() => _statusBusy = true);
     try {
       await FirebaseFunctions.instance.httpsCallable('updateWalkerBookingStatus').call({
         'bookingId': bookingId,
@@ -655,6 +658,8 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
           const SnackBar(content: Text('Could not update this walk. Please try again.')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _statusBusy = false);
     }
   }
 
@@ -753,14 +758,22 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                       const SizedBox(height: 10),
                       if (booking['status'] == 'in_progress')
                         FilledButton.icon(
-                          onPressed: () => _updateBookingStatus(booking['bookingId'] as String, 'complete'),
-                          icon: const Icon(Icons.check_circle_outline),
+                          onPressed: _statusBusy
+                            ? null
+                            : () => _updateBookingStatus(booking['bookingId'] as String, 'complete'),
+                          icon: _statusBusy
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.check_circle_outline),
                           label: const Text('Complete walk'),
                         )
                       else
                         FilledButton.icon(
-                          onPressed: () => _updateBookingStatus(booking['bookingId'] as String, 'start'),
-                          icon: const Icon(Icons.play_arrow),
+                          onPressed: _statusBusy
+                            ? null
+                            : () => _updateBookingStatus(booking['bookingId'] as String, 'start'),
+                          icon: _statusBusy
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.play_arrow),
                           label: const Text('Start walk'),
                         ),
                     ]),
