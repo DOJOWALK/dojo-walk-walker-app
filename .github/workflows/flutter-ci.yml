@@ -1,8 +1,9 @@
 name: Walker Flutter Android CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feat/no-payment-booking]
     paths:
       - "lib/**"
       - "test/**"
@@ -14,7 +15,7 @@ on:
       - "scripts/**"
       - "DOJO PARTNER.png"
   pull_request:
-    branches: [main]
+    branches: [main, feat/no-payment-booking]
     paths:
       - "lib/**"
       - "test/**"
