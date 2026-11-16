@@ -251,7 +251,7 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
                         : () => _requestOtp(resend: true),
                     child: Text(
                       _resendSeconds > 0
-                          ? 'Resend OTP in 00:${_resendSeconds.toString().padLeft(2, '0')}'
+                          ? 'Resend OTP in ${(_resendSeconds ~/ 60).toString().padLeft(2, '0')}:${(_resendSeconds % 60).toString().padLeft(2, '0')}'
                           : 'Resend OTP',
                     ),
                   ),
