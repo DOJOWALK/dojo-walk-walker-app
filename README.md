@@ -7,7 +7,7 @@ Flutter app for DOJO WALK walker onboarding and walk fulfilment.
 - Mobile-number-only sign-in with a separate OTP screen; Firebase Android auto-verification is used when available, with manual OTP fallback.
 - Automatic Firebase phone-account resolution: an existing phone account returns to its existing UID/profile; a first-time phone number receives a new account and opens the worker application flow.
 - Optional email collected only in the worker application form; email/password is not a login method.
-- Walker application submission and pending/approved account states.
+- Walker application submission and pending/approved account states; email is optional on the application form only.
 - Availability-window creation through the authenticated backend.
 - Assigned upcoming and in-progress walk dashboard.
 - Authenticated start/complete actions, with assignment ownership and timing checks enforced by backend callables.
