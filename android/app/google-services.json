@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "177087606182-fa2i7r03jvp6gkh4sgvt1rgt2s9pf7jn.apps.googleusercontent.com",
+          "client_id": "177087606182-j9alvg0u62t1tjijkrga9s3cv6jetvcr.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.dojo.dojo_walk",
-            "certificate_hash": "8eb4a7488d7bc27670f03f131a970294cd9d35a4"
+            "certificate_hash": "e5c385f195c998e1ac2897cefc95bb264aee01e4"
           }
         },
         {
@@ -51,11 +51,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "177087606182-v33l6j55d4omc8o2k4t1aj6vhhqol9o9.apps.googleusercontent.com",
+          "client_id": "177087606182-hedob1pbcg9mdo0271qkk4tlm6jochgv.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.dojo_partner",
-            "certificate_hash": "7479004edaf1add5bd7429314aa2e0a766badc65"
+            "certificate_hash": "551ab4cc1e4b3e302f3483ab6c87a466a39eb73c"
           }
         },
         {
