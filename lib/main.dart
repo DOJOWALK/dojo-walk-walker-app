@@ -1063,7 +1063,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                             : const Icon(Icons.check_circle_outline),
                           label: const Text('Complete walk'),
                         )
-                      else
+                      else if (booking['status'] == 'confirmed')
                         FilledButton.icon(
                           onPressed: _statusBusy
                             ? null
@@ -1072,6 +1072,12 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                             ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.play_arrow),
                           label: const Text('Start walk'),
+                        )
+                      else if (booking['status'] == 'completed')
+                        const ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
+                          title: Text('Walk completed'),
                         ),
                     ]),
                   ),
