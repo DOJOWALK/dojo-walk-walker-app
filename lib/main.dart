@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'phone_number.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,12 +91,7 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
     super.dispose();
   }
 
-  String? _e164Phone() {
-    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) return '+91$digits';
-    if (digits.length == 12 && digits.startsWith('91') && RegExp(r'^91[6-9]\d{9}$').hasMatch(digits)) return '+$digits';
-    return null;
-  }
+  String? _e164Phone() => normalizeIndianMobileNumber(_phone.text);
 
   void _message(String value) {
     if (!mounted) return;
