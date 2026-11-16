@@ -722,11 +722,21 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
   late Future<Map<String, dynamic>> _dashboard;
   bool _saving = false;
   bool _statusBusy = false;
+  Timer? _completionClock;
 
   @override
   void initState() {
     super.initState();
     _reload();
+    _completionClock = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _completionClock?.cancel();
+    super.dispose();
   }
 
   void _reload() {
@@ -1057,12 +1067,26 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                       if (walkerActionForBookingStatus(booking['status'] as String?) == 'complete')
                         FilledButton.icon(
                           onPressed: _statusBusy
+                            || !walkerCanCompleteNow(booking['startedAt'] as String?)
                             ? null
                             : () => _updateBookingStatus(booking['bookingId'] as String, 'complete'),
                           icon: _statusBusy
                             ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.check_circle_outline),
                           label: const Text('Complete walk'),
+                        ),
+                      if (booking['status'] == 'in_progress'
+                          && !walkerCanCompleteNow(booking['startedAt'] as String?))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            booking['startedAt'] is String
+                              ? 'Complete walk unlocks 5 minutes after the recorded start time.'
+                              : 'Start time unavailable. Refresh the dashboard before completing.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF174A78),
+                            ),
+                          ),
                         )
                       else if (walkerActionForBookingStatus(booking['status'] as String?) == 'start')
                         FilledButton.icon(
