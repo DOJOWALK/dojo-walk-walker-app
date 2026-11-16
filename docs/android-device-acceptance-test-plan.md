@@ -18,7 +18,7 @@ Do not request location permission from walkers until a clear, consent-based loc
 1. Install and launch the candidate build; verify no crash on cold start and relaunch.
 2. Sign in with an approved walker account using mobile OTP; verify customer/admin accounts cannot enter walker-only workflows.
 3. Submit a new walker application and verify it remains pending/inactive until admin approval; verify an approved account reaches the dashboard.
-4. Verify the legacy email/password account can be linked to a verified mobile number without silently merging a different existing account.
+4. Verify Android automatic OTP verification on supported devices and manual OTP fallback; verify resend, invalid/expired codes, and change-number navigation.
 5. Sign out and switch accounts; verify prior walk/customer data is cleared from the visible session.
 6. Test invalid OTP, expired session, offline launch, and server permission errors.
 7. Verify no sensitive customer or dog information is exposed outside an assigned job.
