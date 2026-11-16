@@ -159,7 +159,7 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
   Future<void> _verifyOtp() async {
     final verificationId = _verificationId;
     final code = _otp.text.trim();
-    if (verificationId == null || !RegExp(r'^\d{6}$'.hasMatch(code)) {
+    if (verificationId == null || !RegExp(r'^\d{6}$').hasMatch(code)) {
       _message('Enter the 6-digit OTP.');
       return;
     }
