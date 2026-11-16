@@ -814,9 +814,56 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Text('Welcome, ${widget.name}', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 6),
-              const Text('Your walker account is approved and active.'),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF174A78), Color(0xFF2876AD)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF174A78).withValues(alpha: 0.20),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Welcome, ${widget.name}',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            )),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Your walker account is approved and active. Ready for a great walk?',
+                            style: TextStyle(color: Colors.white, height: 1.35),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                      ),
+                      child: const Icon(Icons.directions_walk, color: Colors.white, size: 36),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Text('My availability', style: Theme.of(context).textTheme.titleLarge),
