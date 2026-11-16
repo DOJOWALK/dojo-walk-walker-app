@@ -350,7 +350,7 @@ class _WalkerPortalState extends State<WalkerPortal> {
       }
       return WalkerApplicationScreen(
         initialName: data['displayName'] as String? ?? '',
-        initialPhone: (FirebaseAuth.instance.currentUser?.phoneNumber ?? data['phone'] as String? ?? '').replaceAll(RegExp(r'\\D'), '').replaceFirst(RegExp(r'^91'), ''),
+        initialPhone: (FirebaseAuth.instance.currentUser?.phoneNumber ?? data['phone'] as String? ?? '').replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^91'), ''),
         initialEmail: data['email'] as String? ?? '',
         onSubmitted: _refresh,
         rejected: status == 'rejected',
