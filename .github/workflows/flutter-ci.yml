@@ -99,12 +99,12 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Build Android release APKs (per CPU architecture)
-        run: flutter build apk --release --split-per-abi
+      - name: Build single universal Android release APK
+        run: flutter build apk --release
 
-      - name: Upload smaller release APKs
+      - name: Upload single Partner APK
         uses: actions/upload-artifact@v4
         with:
           name: dojo-walk-walker-release-apks
-          path: build/app/outputs/flutter-apk/app-*-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
