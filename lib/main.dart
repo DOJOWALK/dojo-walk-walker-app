@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -76,9 +78,36 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
   bool _finishing = false;
   String? _verificationId;
   int? _resendToken;
+  Timer? _resendTimer;
+  int _resendSeconds = 0;
+
+  void _startResendCountdown() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendSeconds <= 1) {
+        timer.cancel();
+        _resendTimer = null;
+        setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
+  }
+
+  void _resetResendCountdown() {
+    _resendTimer?.cancel();
+    _resendTimer = null;
+    _resendSeconds = 0;
+  }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _phone.dispose();
     _otp.dispose();
     super.dispose();
@@ -117,6 +146,7 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
             _resendToken = resendToken;
             _codeSent = true;
           });
+          _startResendCountdown();
         },
         codeAutoRetrievalTimeout: (verificationId) {
           _verificationId = verificationId;
@@ -178,7 +208,9 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: _busy ? null : () => setState(() {
+              _resetResendCountdown();
               _codeSent = false;
+              _verificationId = null;
               _otp.clear();
             }),
           ),
@@ -214,11 +246,18 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
                       : const Text('Verify & Continue'),
                   ),
                   TextButton(
-                    onPressed: _busy ? null : () => _requestOtp(resend: true),
-                    child: const Text('Resend OTP'),
+                    onPressed: _busy || _resendSeconds > 0
+                        ? null
+                        : () => _requestOtp(resend: true),
+                    child: Text(
+                      _resendSeconds > 0
+                          ? 'Resend OTP in 00:${_resendSeconds.toString().padLeft(2, '0')}'
+                          : 'Resend OTP',
+                    ),
                   ),
                   TextButton(
                     onPressed: _busy ? null : () => setState(() {
+                      _resetResendCountdown();
                       _codeSent = false;
                       _verificationId = null;
                       _otp.clear();
