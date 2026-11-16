@@ -664,6 +664,51 @@ class WalkerPendingScreen extends StatelessWidget {
   );
 }
 
+class _WalkerDashboardMetric extends StatelessWidget {
+  const _WalkerDashboardMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 145,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(icon, color: accent, size: 19),
+            ),
+            const SizedBox(height: 12),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF174A78),
+            )),
+            const SizedBox(height: 2),
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class WalkerDashboard extends StatefulWidget {
   const WalkerDashboard({required this.name, super.key});
   final String name;
@@ -804,6 +849,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
       final windows = (data['availability'] as List<dynamic>? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final inProgressCount = bookings.where((booking) => booking['status'] == 'in_progress').length;
       return Scaffold(
         appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
@@ -863,6 +909,31 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _WalkerDashboardMetric(
+                    label: 'Assigned walks',
+                    value: bookings.length.toString(),
+                    icon: Icons.pets,
+                    accent: const Color(0xFFF28C28),
+                  ),
+                  _WalkerDashboardMetric(
+                    label: 'In progress',
+                    value: inProgressCount.toString(),
+                    icon: Icons.directions_walk,
+                    accent: const Color(0xFF174A78),
+                  ),
+                  _WalkerDashboardMetric(
+                    label: 'Availability slots',
+                    value: windows.length.toString(),
+                    icon: Icons.calendar_month,
+                    accent: const Color(0xFF2876AD),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
