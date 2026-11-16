@@ -818,6 +818,38 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
     }
   }
 
+  String _bookingStatusLabel(String? status) {
+    switch (status) {
+      case 'in_progress':
+        return 'In progress';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'completed':
+        return 'Completed';
+      default:
+        return 'Status unavailable';
+    }
+  }
+
+  Color _bookingStatusColor(String? status) {
+    switch (status) {
+      case 'in_progress':
+        return const Color(0xFFFFE8CC);
+      case 'confirmed':
+        return const Color(0xFFE5F0FA);
+      case 'completed':
+        return const Color(0xFFE5F4EA);
+      default:
+        return const Color(0xFFECEFF3);
+    }
+  }
+
+  String _paymentStatusLabel(String? status) {
+    if (status == 'paid') return 'Payment received';
+    if (status == null || status.isEmpty) return 'Payment status unavailable';
+    return 'Payment · ${status.replaceAll('_', ' ')}';
+  }
+
   String _formatDate(dynamic value) {
     if (value is! String) return 'Time not available';
     final parsed = DateTime.tryParse(value)?.toLocal();
@@ -982,14 +1014,35 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                       Text(_formatDate(booking['scheduledAt'])),
                       Text('${booking['durationMinutes']} minute walk'),
                       Text('${booking['address']}, ${booking['city']} ${booking['pincode']}'),
-                      const SizedBox(height: 6),
-                      Text(
-                        booking['status'] == 'in_progress' ? 'Walk in progress' : 'Payment confirmed',
-                        style: TextStyle(
-                          color: booking['status'] == 'in_progress' ? Colors.orange.shade800 : Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text(_bookingStatusLabel(booking['status'] as String?)),
+                            backgroundColor: _bookingStatusColor(booking['status'] as String?),
+                            side: BorderSide.none,
+                          ),
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            avatar: const Icon(Icons.payments_outlined, size: 16),
+                            label: Text(_paymentStatusLabel(booking['paymentStatus'] as String?)),
+                            side: BorderSide.none,
+                          ),
+                        ],
                       ),
+                      if (booking['quotedAmountPaise'] is int) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Booking amount · ₹${(booking['quotedAmountPaise'] as int) / 100}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF174A78),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       if (booking['status'] == 'in_progress')
                         FilledButton.icon(
