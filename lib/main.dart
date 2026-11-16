@@ -337,6 +337,9 @@ class _WalkerPortalState extends State<WalkerPortal> {
       if (status == 'approved' && data['active'] == true) {
         return WalkerDashboard(name: data['displayName'] as String? ?? 'Walker');
       }
+      if (status == 'migration_required') {
+        return const WalkerMigrationScreen();
+      }
       if (status == 'pending') {
         return WalkerPendingScreen(
           name: data['displayName'] as String? ?? 'Walker',
@@ -353,6 +356,42 @@ class _WalkerPortalState extends State<WalkerPortal> {
         rejected: status == 'rejected',
       );
     },
+  );
+}
+
+class WalkerMigrationScreen extends StatelessWidget {
+  const WalkerMigrationScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('DOJO WALK • Walker')),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.support_agent, size: 56),
+            const SizedBox(height: 16),
+            Text('Existing worker account found',
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            const Text(
+              'Your verified mobile number matches an older DOJO WALK worker record. '
+              'To protect your work history, we will not create a duplicate account. '
+              'Please contact DOJO WALK support to securely migrate your existing account.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text('Sign out'),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
