@@ -348,6 +348,7 @@ class _WalkerPortalState extends State<WalkerPortal> {
       return WalkerApplicationScreen(
         initialName: data['displayName'] as String? ?? '',
         initialPhone: data['phone'] as String? ?? '',
+        initialEmail: data['email'] as String? ?? '',
         onSubmitted: _refresh,
         rejected: status == 'rejected',
       );
@@ -359,6 +360,7 @@ class WalkerApplicationScreen extends StatefulWidget {
   const WalkerApplicationScreen({
     required this.initialName,
     required this.initialPhone,
+    required this.initialEmail,
     required this.onSubmitted,
     required this.rejected,
     super.key,
@@ -366,6 +368,7 @@ class WalkerApplicationScreen extends StatefulWidget {
 
   final String initialName;
   final String initialPhone;
+  final String initialEmail;
   final Future<void> Function() onSubmitted;
   final bool rejected;
 
@@ -377,7 +380,7 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name = TextEditingController(text: widget.initialName);
   late final TextEditingController _phone = TextEditingController(text: widget.initialPhone);
-  final _email = TextEditingController();
+  late final _email = TextEditingController(text: widget.initialEmail);
   final _pincode = TextEditingController();
   String _city = 'Noida';
   bool _busy = false;
