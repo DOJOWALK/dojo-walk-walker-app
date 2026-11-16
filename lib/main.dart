@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'phone_number.dart';
+import 'booking_actions.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1053,7 +1054,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                         ),
                       ],
                       const SizedBox(height: 10),
-                      if (booking['status'] == 'in_progress')
+                      if (walkerActionForBookingStatus(booking['status'] as String?) == 'complete')
                         FilledButton.icon(
                           onPressed: _statusBusy
                             ? null
@@ -1063,7 +1064,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                             : const Icon(Icons.check_circle_outline),
                           label: const Text('Complete walk'),
                         )
-                      else if (booking['status'] == 'confirmed')
+                      else if (walkerActionForBookingStatus(booking['status'] as String?) == 'start')
                         FilledButton.icon(
                           onPressed: _statusBusy
                             ? null
