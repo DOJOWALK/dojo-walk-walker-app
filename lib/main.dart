@@ -857,7 +857,6 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
         if (bDate == null) return -1;
         return aDate.compareTo(bDate);
       });
-      final nextBooking = sortedBookings.isEmpty ? null : sortedBookings.first;
       return Scaffold(
         appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
