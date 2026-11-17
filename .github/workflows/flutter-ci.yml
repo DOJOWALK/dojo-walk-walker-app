@@ -108,7 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           APK="build/app/outputs/flutter-apk/app-release.apk"
-          SDK="\${ANDROID_HOME:-\${ANDROID_SDK_ROOT:-}}"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           if [[ ! -f "$APK" ]]; then
             echo "::error::Built APK was not found at $APK"
             exit 1
