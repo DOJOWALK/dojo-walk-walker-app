@@ -1,6 +1,7 @@
 name: Walker Flutter Android CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -78,6 +79,18 @@ jobs:
 
       - name: Build Android release APKs (per CPU architecture)
         run: flutter build apk --release --split-per-abi
+
+      - name: Report APK signing certificate fingerprints (public only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
+          if [[ ! -f "$DEBUG_KEYSTORE" ]]; then
+            echo "::error::Gradle debug keystore was not found at $DEBUG_KEYSTORE"
+            exit 1
+          fi
+          echo "The following SHA-1 and SHA-256 fingerprints identify the debug certificate used by this CI build."
+          keytool -list -v -keystore "$DEBUG_KEYSTORE" -storepass android -alias androiddebugkey | grep -E 'SHA1:|SHA256:'
 
       - name: Upload smaller release APKs
         uses: actions/upload-artifact@v4
