@@ -107,13 +107,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
-          if [[ ! -f "$DEBUG_KEYSTORE" ]]; then
-            echo "::error::Gradle debug keystore was not found at $DEBUG_KEYSTORE"
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          SDK="\${ANDROID_HOME:-\${ANDROID_SDK_ROOT:-}}"
+          if [[ ! -f "$APK" ]]; then
+            echo "::error::Built APK was not found at $APK"
             exit 1
           fi
-          echo "The following SHA-1 and SHA-256 fingerprints identify the debug certificate used by this CI build."
-          keytool -list -v -keystore "$DEBUG_KEYSTORE" -storepass android -alias androiddebugkey | grep -E 'SHA1:|SHA256:'
+          if [[ -z "$SDK" || ! -d "$SDK/build-tools" ]]; then
+            echo "::error::Android SDK build-tools directory was not found."
+            exit 1
+          fi
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "::error::apksigner was not found in Android SDK build-tools."
+            exit 1
+          fi
+          echo "Reading the signing certificate directly from the APK built in this job."
+          CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
+          printf '%s\n' "$CERT_OUTPUT"
+          if ! grep -qE 'certificate SHA-1 digest:' <<<"$CERT_OUTPUT"; then
+            echo "::error::APK signing certificate SHA-1 fingerprint was not reported."
+            exit 1
+          fi
+          if ! grep -qE 'certificate SHA-256 digest:' <<<"$CERT_OUTPUT"; then
+            echo "::error::APK signing certificate SHA-256 fingerprint was not reported."
+            exit 1
+          fi
 
       - name: Upload single Partner APK
         uses: actions/upload-artifact@v4
