@@ -1,0 +1,68 @@
+name: Walker Signed Android APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+
+      - name: Validate signing secrets and prepare keystore
+        env:
+          WALKER_KEYSTORE_BASE64: ${{ secrets.WALKER_ANDROID_KEYSTORE_BASE64 }}
+          WALKER_KEYSTORE_PASSWORD: ${{ secrets.WALKER_ANDROID_KEYSTORE_PASSWORD }}
+          WALKER_KEY_ALIAS: ${{ secrets.WALKER_ANDROID_KEY_ALIAS }}
+          WALKER_KEY_PASSWORD: ${{ secrets.WALKER_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in WALKER_KEYSTORE_BASE64 WALKER_KEYSTORE_PASSWORD WALKER_KEY_ALIAS WALKER_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions secret: ${name}"
+              exit 1
+            fi
+          done
+          KEYSTORE_PATH="$RUNNER_TEMP/walker-release-key.jks"
+          printf '%s' "$WALKER_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          echo "WALKER_KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "WALKER_KEYSTORE_PASSWORD=$WALKER_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "WALKER_KEY_ALIAS=$WALKER_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "WALKER_KEY_PASSWORD=$WALKER_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build signed universal Android release APK
+        run: flutter build apk --release
+
+      - name: Verify APK signature
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)/apksigner" verify --verbose "$APK"
+
+      - name: Upload signed Walker APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dojo-walk-walker-signed-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
