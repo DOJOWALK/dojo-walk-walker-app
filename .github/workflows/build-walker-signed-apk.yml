@@ -47,6 +47,13 @@ jobs:
           echo "WALKER_KEY_ALIAS=$WALKER_KEY_ALIAS" >> "$GITHUB_ENV"
           echo "WALKER_KEY_PASSWORD=$WALKER_KEY_PASSWORD" >> "$GITHUB_ENV"
 
+      - name: Show release certificate fingerprints
+        env:
+          WALKER_KEYSTORE_PASSWORD: ${{ secrets.WALKER_ANDROID_KEYSTORE_PASSWORD }}
+          WALKER_KEY_ALIAS: ${{ secrets.WALKER_ANDROID_KEY_ALIAS }}
+        run: |
+          keytool -list -v -keystore "$WALKER_KEYSTORE_FILE" -storepass "$WALKER_KEYSTORE_PASSWORD" -alias "$WALKER_KEY_ALIAS" | grep -E 'SHA1:|SHA256:'
+
       - name: Install dependencies
         run: flutter pub get
 
