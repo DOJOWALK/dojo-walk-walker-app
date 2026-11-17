@@ -1,6 +1,7 @@
 name: Walker Flutter Android CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -49,24 +50,24 @@ jobs:
 
           settings_text = settings.read_text()
           if "com.google.gms.google-services" not in settings_text:
-              line = ('    id("com.google.gms.google-services") version "4.4.2" apply false\n'
+              line = ('    id("com.google.gms.google-services") version "4.4.2" apply false\\n'
                       if settings.suffix == ".kts" else
-                      "    id 'com.google.gms.google-services' version '4.4.2' apply false\n")
+                      "    id 'com.google.gms.google-services' version '4.4.2' apply false\\n")
               marker = "plugins {"
               if marker not in settings_text:
                   raise SystemExit("Could not find Gradle plugins block in settings file.")
-              settings_text = settings_text.replace(marker, marker + "\n" + line.rstrip(), 1)
+              settings_text = settings_text.replace(marker, marker + "\\n" + line.rstrip(), 1)
               settings.write_text(settings_text)
 
           app_text = app.read_text()
           if "com.google.gms.google-services" not in app_text:
-              line = ('    id("com.google.gms.google-services")\n'
+              line = ('    id("com.google.gms.google-services")\\n'
                       if app.suffix == ".kts" else
-                      "    id 'com.google.gms.google-services'\n")
+                      "    id 'com.google.gms.google-services'\\n")
               marker = "plugins {"
               if marker not in app_text:
                   raise SystemExit("Could not find Gradle plugins block in app file.")
-              app_text = app_text.replace(marker, marker + "\n" + line.rstrip(), 1)
+              app_text = app_text.replace(marker, marker + "\\n" + line.rstrip(), 1)
               app.write_text(app_text)
           PY
 
@@ -78,6 +79,18 @@ jobs:
 
       - name: Build Android release APKs (per CPU architecture)
         run: flutter build apk --release --split-per-abi
+
+      - name: Report APK signing certificate fingerprints (public only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
+          if [[ ! -f "$DEBUG_KEYSTORE" ]]; then
+            echo "::error::Gradle debug keystore was not found at $DEBUG_KEYSTORE"
+            exit 1
+          fi
+          echo "The following SHA-1 and SHA-256 fingerprints identify the debug certificate used by this CI build."
+          keytool -list -v -keystore "$DEBUG_KEYSTORE" -storepass android -alias androiddebugkey | grep -E 'SHA1:|SHA256:'
 
       - name: Upload smaller release APKs
         uses: actions/upload-artifact@v4
