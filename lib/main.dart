@@ -393,7 +393,7 @@ class _WalkerPortalState extends State<WalkerPortal> {
   }
 
   void _load() {
-    _application = FirebaseFunctions.instance
+    _application = FirebaseFunctions.instanceFor(region: 'asia-south1')
       .httpsCallable('getWalkerApplication')
       .call()
       .then((result) => Map<String, dynamic>.from(result.data as Map));
@@ -533,7 +533,7 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      await FirebaseFunctions.instance.httpsCallable('submitWalkerApplication').call({
+      await FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('submitWalkerApplication').call({
         'displayName': _name.text.trim(),
         'phone': _phone.text.trim(),
         'email': _email.text.trim(),
@@ -740,7 +740,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
   }
 
   void _reload() {
-    _dashboard = FirebaseFunctions.instance.httpsCallable('getWalkerDashboard')
+    _dashboard = FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('getWalkerDashboard')
       .call().then((result) => Map<String, dynamic>.from(result.data as Map));
   }
 
@@ -776,7 +776,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
     }
     setState(() => _saving = true);
     try {
-      await FirebaseFunctions.instance.httpsCallable('saveWalkerAvailability').call({
+      await FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('saveWalkerAvailability').call({
         'windows': [{'startAt': start.toUtc().toIso8601String(), 'endAt': end.toUtc().toIso8601String()}],
       });
       await _refresh();
@@ -802,7 +802,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
     if (_statusBusy) return;
     setState(() => _statusBusy = true);
     try {
-      await FirebaseFunctions.instance.httpsCallable('updateWalkerBookingStatus').call({
+      await FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('updateWalkerBookingStatus').call({
         'bookingId': bookingId,
         'action': action,
       });
