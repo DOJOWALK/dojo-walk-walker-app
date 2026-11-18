@@ -4,6 +4,16 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+val walkerKeystoreFile = System.getenv("WALKER_KEYSTORE_FILE")
+val walkerKeystorePassword = System.getenv("WALKER_KEYSTORE_PASSWORD")
+val walkerKeyAlias = System.getenv("WALKER_KEY_ALIAS")
+val walkerKeyPassword = System.getenv("WALKER_KEY_PASSWORD")
+val hasWalkerReleaseSigning = listOf(
+    walkerKeystoreFile,
+    walkerKeystorePassword,
+    walkerKeyAlias,
+    walkerKeyPassword
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.example.dojo_partner"
@@ -30,11 +40,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasWalkerReleaseSigning) {
+            create("walkerRelease") {
+                storeFile = file(walkerKeystoreFile!!)
+                storePassword = walkerKeystorePassword
+                keyAlias = walkerKeyAlias
+                keyPassword = walkerKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasWalkerReleaseSigning) {
+                signingConfigs.getByName("walkerRelease")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
