@@ -10,6 +10,8 @@ on:
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".github/workflows/flutter-ci.yml"
+      - "scripts/**"
+      - "DOJO PARTNER.png"
   pull_request:
     branches: [main]
     paths:
@@ -18,9 +20,11 @@ on:
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".github/workflows/flutter-ci.yml"
+      - "scripts/**"
+      - "DOJO PARTNER.png"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   android:
@@ -28,8 +32,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Python for launcher icon generation
+        uses: actions/setup-python@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: '3.x'
+
+      - name: Generate DOJO PARTNER Android launcher icons
+        run: |
+          python -m pip install --upgrade pip Pillow
+          python scripts/generate_android_launcher_icons.py --logo "DOJO PARTNER.png" --label "DOJO PARTNER" --background "#174A78"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -74,11 +86,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Run tests
+        run: flutter test
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Build Android release APKs (per CPU architecture)
-        run: flutter build apk --release --split-per-abi
+      - name: Build single universal Android release APK
+        run: flutter build apk --release
 
       - name: Report APK signing certificate fingerprints (public only)
         shell: bash
@@ -92,9 +107,9 @@ jobs:
           echo "The following SHA-1 and SHA-256 fingerprints identify the debug certificate used by this CI build."
           keytool -list -v -keystore "$DEBUG_KEYSTORE" -storepass android -alias androiddebugkey | grep -E 'SHA1:|SHA256:'
 
-      - name: Upload smaller release APKs
+      - name: Upload single Partner APK
         uses: actions/upload-artifact@v4
         with:
           name: dojo-walk-walker-release-apks
-          path: build/app/outputs/flutter-apk/app-*-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error

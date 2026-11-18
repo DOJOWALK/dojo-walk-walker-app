@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'phone_number.dart';
+import 'booking_actions.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,9 +34,70 @@ class WalkerApp extends StatelessWidget {
     title: 'DOJO WALK Walker',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
-      colorSchemeSeed: const Color(0xFFFF7900),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFFF28C28),
+        primary: const Color(0xFFF28C28),
+        secondary: const Color(0xFF174A78),
+        surface: const Color(0xFFFFFDF9),
+      ),
       useMaterial3: true,
-      inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+      scaffoldBackgroundColor: const Color(0xFFF6F8FB),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFFFFFDF9),
+        foregroundColor: Color(0xFF174A78),
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        centerTitle: false,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 3,
+        shadowColor: Color(0x24174A78),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE8EDF3)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDCE4ED)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDCE4ED)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFF28C28), width: 1.8),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+          elevation: 3,
+          shadowColor: const Color(0x55F28C28),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          side: const BorderSide(color: Color(0xFF174A78), width: 1.2),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     ),
     home: const WalkerAuthGate(),
   );
@@ -65,39 +130,54 @@ class WalkerSignInScreen extends StatefulWidget {
 class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
   final _phone = TextEditingController();
   final _otp = TextEditingController();
-  final _displayName = TextEditingController();
-  final _legacyEmail = TextEditingController();
-  final _legacyPassword = TextEditingController();
   bool _busy = false;
   bool _codeSent = false;
-  bool _linkingLegacy = false;
-  bool _showLegacy = false;
+  bool _finishing = false;
   String? _verificationId;
   int? _resendToken;
+  Timer? _resendTimer;
+  int _resendSeconds = 0;
+
+  void _startResendCountdown() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendSeconds <= 1) {
+        timer.cancel();
+        _resendTimer = null;
+        setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
+  }
+
+  void _resetResendCountdown() {
+    _resendTimer?.cancel();
+    _resendTimer = null;
+    _resendSeconds = 0;
+  }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _phone.dispose();
     _otp.dispose();
-    _displayName.dispose();
-    _legacyEmail.dispose();
-    _legacyPassword.dispose();
     super.dispose();
   }
 
-  String? _e164Phone() {
-    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) return '+91$digits';
-    if (digits.length == 12 && digits.startsWith('91') && RegExp(r'^91[6-9]\d{9}$').hasMatch(digits)) return '+$digits';
-    return null;
-  }
+  String? _e164Phone() => normalizeIndianMobileNumber(_phone.text);
 
   void _message(String value) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
 
-  Future<void> _requestOtp({bool linkLegacy = false, bool resend = false}) async {
+  Future<void> _requestOtp({bool resend = false}) async {
     final phone = _e164Phone();
     if (phone == null) {
       _message('Enter a valid 10-digit Indian mobile number.');
@@ -105,29 +185,12 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
     }
     setState(() => _busy = true);
     try {
-      final auth = FirebaseAuth.instance;
-      if (linkLegacy && !_linkingLegacy) {
-        if (_legacyEmail.text.trim().isEmpty || _legacyPassword.text.isEmpty) {
-          _message('Enter your existing account email and password first.');
-          return;
-        }
-        final result = await auth.signInWithEmailAndPassword(
-          email: _legacyEmail.text.trim(),
-          password: _legacyPassword.text,
-        );
-        if (result.user == null) throw FirebaseAuthException(code: 'user-not-found');
-        if (result.user!.phoneNumber != null) {
-          _message('This account already has a verified phone. Sign in using mobile OTP.');
-          return;
-        }
-        _linkingLegacy = true;
-      }
-
-      await auth.verifyPhoneNumber(
+      await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: phone,
         timeout: const Duration(seconds: 60),
         forceResendingToken: resend ? _resendToken : null,
         verificationCompleted: (credential) async {
+          // Android may verify the SMS automatically; no manual OTP entry is needed.
           await _finishCredential(credential);
         },
         verificationFailed: (error) {
@@ -140,16 +203,14 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
             _resendToken = resendToken;
             _codeSent = true;
           });
-          _message('OTP sent. Enter the 6-digit code.');
+          _startResendCountdown();
         },
         codeAutoRetrievalTimeout: (verificationId) {
           _verificationId = verificationId;
         },
       );
     } on FirebaseAuthException catch (error) {
-      _message(error.code == 'credential-already-in-use' || error.code == 'phone-number-already-exists'
-        ? 'This mobile number is linked to another account. Account recovery is required; accounts will not be merged automatically.'
-        : error.message ?? 'Authentication failed. Please try again.');
+      _message(error.message ?? 'Authentication failed. Please try again.');
     } catch (_) {
       _message('Something went wrong. Please try again.');
     } finally {
@@ -158,32 +219,27 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
   }
 
   Future<void> _finishCredential(PhoneAuthCredential credential) async {
+    if (_finishing) return;
+    _finishing = true;
+    if (mounted) setState(() => _busy = true);
     try {
-      final auth = FirebaseAuth.instance;
-      if (auth.currentUser != null && auth.currentUser!.phoneNumber == null) {
-        await auth.currentUser!.linkWithCredential(credential);
-        await auth.currentUser!.reload();
-      } else {
-        await auth.signInWithCredential(credential);
-      }
-      final name = _displayName.text.trim();
-      if (name.isNotEmpty && auth.currentUser != null) {
-        await auth.currentUser!.updateDisplayName(name);
-      }
+      // Firebase resolves an existing phone account to its original UID;
+      // a first-time phone number receives a new Auth account automatically.
+      await FirebaseAuth.instance.signInWithCredential(credential);
       if (!mounted) return;
       setState(() {
         _codeSent = false;
-        _linkingLegacy = false;
         _verificationId = null;
         _otp.clear();
       });
-      _message('Mobile number verified successfully.');
+      _message('Mobile number verified. Welcome to DOJO WALK Walker.');
     } on FirebaseAuthException catch (error) {
-      _message(error.code == 'credential-already-in-use' || error.code == 'phone-number-already-exists'
-        ? 'This mobile number belongs to another account. Please contact support for secure account recovery.'
-        : error.message ?? 'Could not verify this mobile number.');
+      _message(error.message ?? 'Could not verify this mobile number.');
     } catch (_) {
       _message('Could not complete mobile verification. Please try again.');
+    } finally {
+      _finishing = false;
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -194,49 +250,101 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
       _message('Enter the 6-digit OTP.');
       return;
     }
-    setState(() => _busy = true);
-    try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: verificationId,
-        smsCode: code,
-      );
-      await _finishCredential(credential);
-    } on FirebaseAuthException catch (error) {
-      _message(error.message ?? 'Invalid or expired OTP.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _finishCredential(PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: code,
+    ));
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('DOJO WALK • Walker')),
-    body: Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.pets, size: 58),
-              const SizedBox(height: 14),
-              Text(
-                _linkingLegacy ? 'Secure your existing account' : 'Welcome to DOJO WALK',
-                style: Theme.of(context).textTheme.headlineSmall,
+  Widget build(BuildContext context) {
+    if (_codeSent) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Verify mobile number'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _busy ? null : () => setState(() {
+              _resetResendCountdown();
+              _codeSent = false;
+              _verificationId = null;
+              _otp.clear();
+            }),
+          ),
+        ),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.mark_email_read_outlined, size: 54),
+                  const SizedBox(height: 18),
+                  Text('Enter OTP', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 8),
+                  Text('6-digit code sent to +91 ${_phone.text.trim()}'),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _otp,
+                    keyboardType: TextInputType.number,
+                    autofillHints: const [AutofillHints.oneTimeCode],
+                    textInputAction: TextInputAction.done,
+                    maxLength: 6,
+                    decoration: const InputDecoration(labelText: '6-digit OTP', counterText: ''),
+                    onSubmitted: (_) => _busy ? null : _verifyOtp(),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _busy ? null : _verifyOtp,
+                    child: _busy
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Verify & Continue'),
+                  ),
+                  TextButton(
+                    onPressed: _busy || _resendSeconds > 0
+                        ? null
+                        : () => _requestOtp(resend: true),
+                    child: Text(
+                      _resendSeconds > 0
+                          ? 'Resend OTP in ${(_resendSeconds ~/ 60).toString().padLeft(2, '0')}:${(_resendSeconds % 60).toString().padLeft(2, '0')}'
+                          : 'Resend OTP',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _busy ? null : () => setState(() {
+                      _resetResendCountdown();
+                      _codeSent = false;
+                      _verificationId = null;
+                      _otp.clear();
+                    }),
+                    child: const Text('Change mobile number'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(_linkingLegacy
-                ? 'Verify your mobile by OTP. It will be linked to your existing account so your history stays safe.'
-                : 'Continue securely with your mobile number. No password required.'),
-              const SizedBox(height: 24),
-              if (!_codeSent && !_showLegacy) ...[
-                TextField(
-                  controller: _displayName,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(labelText: 'Your name (optional)'),
-                ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('DOJO WALK • Walker')),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(Icons.pets, size: 58),
                 const SizedBox(height: 14),
+                Text('Welcome to DOJO WALK', style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
+                const Text('Walker account में आगे बढ़ने के लिए मोबाइल नंबर डालें।'),
+                const SizedBox(height: 24),
                 TextField(
                   controller: _phone,
                   keyboardType: TextInputType.phone,
@@ -252,73 +360,20 @@ class _WalkerSignInScreenState extends State<WalkerSignInScreen> {
                   onPressed: _busy ? null : () => _requestOtp(),
                   child: _busy
                     ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Continue with OTP'),
+                    : const Text('Continue'),
                 ),
-                TextButton(
-                  onPressed: _busy ? null : () => setState(() => _showLegacy = true),
-                  child: const Text('Already have an account? Link it safely'),
+                const SizedBox(height: 12),
+                const Text(
+                  'By continuing, you agree to receive an OTP for mobile verification.',
+                  textAlign: TextAlign.center,
                 ),
               ],
-              if (!_codeSent && _showLegacy) ...[
-                const Text('Existing account recovery'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _legacyEmail,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Existing account email'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _legacyPassword,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Existing account password'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _phone,
-                  keyboardType: TextInputType.phone,
-                  maxLength: 10,
-                  decoration: const InputDecoration(labelText: 'Mobile number to verify', prefixText: '+91 ', counterText: ''),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _busy ? null : () => _requestOtp(linkLegacy: true),
-                  child: _busy
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Verify & link mobile'),
-                ),
-                TextButton(
-                  onPressed: _busy ? null : () => setState(() => _showLegacy = false),
-                  child: const Text('Back to mobile OTP sign in'),
-                ),
-              ],
-              if (_codeSent) ...[
-                Text('Enter the OTP sent to +91 ' + _phone.text.trim()),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _otp,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: const InputDecoration(labelText: '6-digit OTP', counterText: ''),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _busy ? null : _verifyOtp,
-                  child: _busy
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Verify OTP'),
-                ),
-                TextButton(
-                  onPressed: _busy ? null : () => _requestOtp(resend: true),
-                  child: const Text('Resend OTP'),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class WalkerPortal extends StatefulWidget {
@@ -338,8 +393,8 @@ class _WalkerPortalState extends State<WalkerPortal> {
   }
 
   void _load() {
-    _application = FirebaseFunctions.instance
-      .httpsCallable('getWalkerApplication')
+    _application = FirebaseFunctions.instanceFor(region: 'asia-south1')
+      .httpsCallable('getWalkerApplicationMumbai')
       .call()
       .then((result) => Map<String, dynamic>.from(result.data as Map));
   }
@@ -378,6 +433,9 @@ class _WalkerPortalState extends State<WalkerPortal> {
       if (status == 'approved' && data['active'] == true) {
         return WalkerDashboard(name: data['displayName'] as String? ?? 'Walker');
       }
+      if (status == 'migration_required') {
+        return const WalkerMigrationScreen();
+      }
       if (status == 'pending') {
         return WalkerPendingScreen(
           name: data['displayName'] as String? ?? 'Walker',
@@ -388,7 +446,8 @@ class _WalkerPortalState extends State<WalkerPortal> {
       }
       return WalkerApplicationScreen(
         initialName: data['displayName'] as String? ?? '',
-        initialPhone: data['phone'] as String? ?? '',
+        initialPhone: (FirebaseAuth.instance.currentUser?.phoneNumber ?? data['phone'] as String? ?? '').replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^91'), ''),
+        initialEmail: data['email'] as String? ?? '',
         onSubmitted: _refresh,
         rejected: status == 'rejected',
       );
@@ -396,10 +455,47 @@ class _WalkerPortalState extends State<WalkerPortal> {
   );
 }
 
+class WalkerMigrationScreen extends StatelessWidget {
+  const WalkerMigrationScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('DOJO WALK • Walker')),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.support_agent, size: 56),
+            const SizedBox(height: 16),
+            Text('Existing worker account found',
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            const Text(
+              'Your verified mobile number matches an older DOJO WALK worker record. '
+              'To protect your work history, we will not create a duplicate account. '
+              'Please contact DOJO WALK support to securely migrate your existing account.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text('Sign out'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class WalkerApplicationScreen extends StatefulWidget {
   const WalkerApplicationScreen({
     required this.initialName,
     required this.initialPhone,
+    required this.initialEmail,
     required this.onSubmitted,
     required this.rejected,
     super.key,
@@ -407,6 +503,7 @@ class WalkerApplicationScreen extends StatefulWidget {
 
   final String initialName;
   final String initialPhone;
+  final String initialEmail;
   final Future<void> Function() onSubmitted;
   final bool rejected;
 
@@ -418,6 +515,7 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name = TextEditingController(text: widget.initialName);
   late final TextEditingController _phone = TextEditingController(text: widget.initialPhone);
+  late final _email = TextEditingController(text: widget.initialEmail);
   final _pincode = TextEditingController();
   String _city = 'Noida';
   bool _busy = false;
@@ -426,6 +524,7 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
   void dispose() {
     _name.dispose();
     _phone.dispose();
+    _email.dispose();
     _pincode.dispose();
     super.dispose();
   }
@@ -434,9 +533,10 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      await FirebaseFunctions.instance.httpsCallable('submitWalkerApplication').call({
+      await FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('submitWalkerApplicationMumbai').call({
         'displayName': _name.text.trim(),
         'phone': _phone.text.trim(),
+        'email': _email.text.trim(),
         'city': _city,
         'pincode': _pincode.text.trim(),
       });
@@ -484,10 +584,22 @@ class _WalkerApplicationScreenState extends State<WalkerApplicationScreen> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: '10-digit mobile number'),
+              readOnly: true,
+              decoration: const InputDecoration(labelText: 'Verified mobile number', prefixText: '+91 '),
               validator: (v) => v == null || !RegExp(r'^[6-9][0-9]{9}$').hasMatch(v.trim())
                 ? 'Enter a valid 10-digit Indian mobile number' : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email address (optional)'),
+              validator: (v) {
+                final value = v?.trim() ?? '';
+                if (value.isEmpty) return null;
+                return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)
+                    ? null : 'Enter a valid email address or leave it blank';
+              },
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
@@ -553,6 +665,51 @@ class WalkerPendingScreen extends StatelessWidget {
   );
 }
 
+class _WalkerDashboardMetric extends StatelessWidget {
+  const _WalkerDashboardMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 145,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(icon, color: accent, size: 19),
+            ),
+            const SizedBox(height: 12),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF174A78),
+            )),
+            const SizedBox(height: 2),
+            Text(label, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class WalkerDashboard extends StatefulWidget {
   const WalkerDashboard({required this.name, super.key});
   final String name;
@@ -564,15 +721,26 @@ class WalkerDashboard extends StatefulWidget {
 class _WalkerDashboardState extends State<WalkerDashboard> {
   late Future<Map<String, dynamic>> _dashboard;
   bool _saving = false;
+  bool _statusBusy = false;
+  Timer? _completionClock;
 
   @override
   void initState() {
     super.initState();
     _reload();
+    _completionClock = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _completionClock?.cancel();
+    super.dispose();
   }
 
   void _reload() {
-    _dashboard = FirebaseFunctions.instance.httpsCallable('getWalkerDashboard')
+    _dashboard = FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('getWalkerDashboardMumbai')
       .call().then((result) => Map<String, dynamic>.from(result.data as Map));
   }
 
@@ -608,7 +776,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
     }
     setState(() => _saving = true);
     try {
-      await FirebaseFunctions.instance.httpsCallable('saveWalkerAvailability').call({
+      await FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('saveWalkerAvailabilityMumbai').call({
         'windows': [{'startAt': start.toUtc().toIso8601String(), 'endAt': end.toUtc().toIso8601String()}],
       });
       await _refresh();
@@ -631,8 +799,10 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
   }
 
   Future<void> _updateBookingStatus(String bookingId, String action) async {
+    if (_statusBusy) return;
+    setState(() => _statusBusy = true);
     try {
-      await FirebaseFunctions.instance.httpsCallable('updateWalkerBookingStatus').call({
+      await FirebaseFunctions.instanceFor(region: 'asia-south1').httpsCallable('updateWalkerBookingStatusMumbai').call({
         'bookingId': bookingId,
         'action': action,
       });
@@ -654,7 +824,42 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
           const SnackBar(content: Text('Could not update this walk. Please try again.')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _statusBusy = false);
     }
+  }
+
+  String _bookingStatusLabel(String? status) {
+    switch (status) {
+      case 'in_progress':
+        return 'In progress';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'completed':
+        return 'Completed';
+      default:
+        return 'Status unavailable';
+    }
+  }
+
+  Color _bookingStatusColor(String? status) {
+    switch (status) {
+      case 'in_progress':
+        return const Color(0xFFFFE8CC);
+      case 'confirmed':
+        return const Color(0xFFE5F0FA);
+      case 'completed':
+        return const Color(0xFFE5F4EA);
+      default:
+        return const Color(0xFFECEFF3);
+    }
+  }
+
+  String _paymentStatusLabel(String? status) {
+    if (status == 'not_required') return 'No payment required';
+    if (status == 'paid') return 'Payment received';
+    if (status == null || status.isEmpty) return 'Payment status unavailable';
+    return 'Payment · ${status.replaceAll('_', ' ')}';
   }
 
   String _formatDate(dynamic value) {
@@ -688,6 +893,14 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
       final windows = (data['availability'] as List<dynamic>? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final inProgressCount = bookings.where((booking) => booking['status'] == 'in_progress').length;
+      final sortedBookings = [...bookings]..sort((a, b) {
+        final aDate = DateTime.tryParse(a['scheduledAt']?.toString() ?? '');
+        final bDate = DateTime.tryParse(b['scheduledAt']?.toString() ?? '');
+        if (aDate == null) return bDate == null ? 0 : 1;
+        if (bDate == null) return -1;
+        return aDate.compareTo(bDate);
+      });
       return Scaffold(
         appBar: AppBar(title: const Text('DOJO WALK • Walker'), actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
@@ -698,9 +911,81 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Text('Welcome, ${widget.name}', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 6),
-              const Text('Your walker account is approved and active.'),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF174A78), Color(0xFF2876AD)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF174A78).withValues(alpha: 0.20),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Welcome, ${widget.name}',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            )),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Your walker account is approved and active. Ready for a great walk?',
+                            style: TextStyle(color: Colors.white, height: 1.35),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                      ),
+                      child: const Icon(Icons.directions_walk, color: Colors.white, size: 36),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _WalkerDashboardMetric(
+                    label: 'Assigned walks',
+                    value: bookings.length.toString(),
+                    icon: Icons.pets,
+                    accent: const Color(0xFFF28C28),
+                  ),
+                  _WalkerDashboardMetric(
+                    label: 'In progress',
+                    value: inProgressCount.toString(),
+                    icon: Icons.directions_walk,
+                    accent: const Color(0xFF174A78),
+                  ),
+                  _WalkerDashboardMetric(
+                    label: 'Availability slots',
+                    value: windows.length.toString(),
+                    icon: Icons.calendar_month,
+                    accent: const Color(0xFF2876AD),
+                  ),
+                ],
+              ),
               const SizedBox(height: 24),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Text('My availability', style: Theme.of(context).textTheme.titleLarge),
@@ -731,7 +1016,7 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                   child: Text('No confirmed upcoming walks assigned yet. New confirmed bookings will appear here.'),
                 ))
               else
-                ...bookings.map((booking) => Card(
+                ...sortedBookings.map((booking) => Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -740,27 +1025,85 @@ class _WalkerDashboardState extends State<WalkerDashboard> {
                       const SizedBox(height: 6),
                       Text(_formatDate(booking['scheduledAt'])),
                       Text('${booking['durationMinutes']} minute walk'),
-                      Text('${booking['address']}, ${booking['city']} ${booking['pincode']}'),
-                      const SizedBox(height: 6),
-                      Text(
-                        booking['status'] == 'in_progress' ? 'Walk in progress' : 'Payment confirmed',
-                        style: TextStyle(
-                          color: booking['status'] == 'in_progress' ? Colors.orange.shade800 : Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      if (booking['endsAt'] is String)
+                        Text('Planned end · ${_formatDate(booking['endsAt'])}'),
+                      if (booking['startedAt'] is String)
+                        Text('Started · ${_formatDate(booking['startedAt'])}'),
+                      const SizedBox(height: 4),
+                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF174A78)),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('${booking['address']}, ${booking['city']} ${booking['pincode']}')),
+                      ]),
                       const SizedBox(height: 10),
-                      if (booking['status'] == 'in_progress')
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text(_bookingStatusLabel(booking['status'] as String?)),
+                            backgroundColor: _bookingStatusColor(booking['status'] as String?),
+                            side: BorderSide.none,
+                          ),
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            avatar: const Icon(Icons.payments_outlined, size: 16),
+                            label: Text(_paymentStatusLabel(booking['paymentStatus'] as String?)),
+                            side: BorderSide.none,
+                          ),
+                        ],
+                      ),
+                      if (booking['quotedAmountPaise'] is int) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Booking amount · ₹${(booking['quotedAmountPaise'] as int) / 100}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF174A78),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      if (walkerActionForBookingStatus(booking['status'] as String?) == 'complete')
                         FilledButton.icon(
-                          onPressed: () => _updateBookingStatus(booking['bookingId'] as String, 'complete'),
-                          icon: const Icon(Icons.check_circle_outline),
+                          onPressed: _statusBusy
+                            || !walkerCanCompleteNow(booking['startedAt'] as String?)
+                            ? null
+                            : () => _updateBookingStatus(booking['bookingId'] as String, 'complete'),
+                          icon: _statusBusy
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.check_circle_outline),
                           label: const Text('Complete walk'),
+                        ),
+                      if (booking['status'] == 'in_progress'
+                          && !walkerCanCompleteNow(booking['startedAt'] as String?))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            booking['startedAt'] is String
+                              ? 'Complete walk unlocks 5 minutes after the recorded start time.'
+                              : 'Start time unavailable. Refresh the dashboard before completing.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF174A78),
+                            ),
+                          ),
                         )
-                      else
+                      else if (walkerActionForBookingStatus(booking['status'] as String?) == 'start')
                         FilledButton.icon(
-                          onPressed: () => _updateBookingStatus(booking['bookingId'] as String, 'start'),
-                          icon: const Icon(Icons.play_arrow),
+                          onPressed: _statusBusy
+                            ? null
+                            : () => _updateBookingStatus(booking['bookingId'] as String, 'start'),
+                          icon: _statusBusy
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.play_arrow),
                           label: const Text('Start walk'),
+                        )
+                      else if (booking['status'] == 'completed')
+                        const ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
+                          title: Text('Walk completed'),
                         ),
                     ]),
                   ),
