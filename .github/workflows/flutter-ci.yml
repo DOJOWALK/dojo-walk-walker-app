@@ -20,6 +20,8 @@ on:
       - "pubspec.yaml"
       - "pubspec.lock"
       - ".github/workflows/flutter-ci.yml"
+      - "scripts/**"
+      - "DOJO PARTNER.png"
 
 permissions:
   contents: write
